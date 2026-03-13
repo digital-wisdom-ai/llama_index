@@ -37,7 +37,7 @@ class GoogleCalendarToolSpec(BaseToolSpec):
 
     """
 
-    spec_functions = ["list_events", "create_event", "get_current_date", "day_of_week_for_date"]
+    spec_functions = ["list_events", "create_event", "get_current_date", "day_of_week_for_date", "next_occurrence_of_day"]
 
     def __init__(
         self,
@@ -58,11 +58,55 @@ class GoogleCalendarToolSpec(BaseToolSpec):
     def day_of_week_for_date(self,
                     date: Union[str, datetime.date]) -> str:
         """
-        Get the day of the week for a given date.
+        Get the day of the week for a given date. You MUST use this tool to verify
+        what day of the week any date falls on. Never guess the day of the week yourself.
+        If a user provides both a day name and a date (e.g., "Saturday, March 22nd"),
+        use this tool to verify the date actually falls on that day.
+
+        Args:
+            date: A date in ISO format (e.g., "2026-03-14") or a datetime.date object.
+
+        Returns:
+            The day of the week as a string (e.g., "Saturday").
         """
         if isinstance(date, str):
             date = datetime.date.fromisoformat(date)
         return date.strftime("%A")
+
+    def next_occurrence_of_day(self,
+                    day_of_week: str,
+                    after_date: Union[str, datetime.date, None] = None) -> str:
+        """
+        Get the next calendar date that falls on the given day of the week.
+        Use this tool whenever a user asks about "next Saturday", "this coming Monday", etc.
+        Returns the first occurrence of that day AFTER the given date (defaults to today).
+
+        Args:
+            day_of_week: The name of the day (e.g., "Saturday", "Monday").
+            after_date: Start searching after this date. Defaults to today if not provided.
+                        Accepts ISO format string (e.g., "2026-03-13") or datetime.date.
+
+        Returns:
+            The date in "Day, Month DD, YYYY" format (e.g., "Saturday, March 14, 2026")
+            along with the ISO format date.
+        """
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        if isinstance(after_date, str):
+            after_date = datetime.date.fromisoformat(after_date)
+        if after_date is None:
+            after_date = datetime.date.today()
+
+        day_of_week_normalized = day_of_week.strip().capitalize()
+        if day_of_week_normalized not in days:
+            return f"Error: '{day_of_week}' is not a valid day of the week. Use one of: {', '.join(days)}"
+
+        target_idx = days.index(day_of_week_normalized)
+        current_idx = after_date.weekday()
+        days_ahead = (target_idx - current_idx) % 7
+        if days_ahead == 0:
+            days_ahead = 7
+        result_date = after_date + datetime.timedelta(days=days_ahead)
+        return f"{result_date.strftime('%A, %B %d, %Y')} ({result_date.isoformat()})"
 
     def _convert_to_date(self, date: Optional[Union[str, datetime.date]]) -> datetime.date:
         """
